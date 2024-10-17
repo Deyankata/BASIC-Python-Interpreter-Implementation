@@ -188,6 +188,8 @@ class Lexer:
         while self.current_char != None:
             if self.current_char in ' \t':
                 self.advance()
+            elif self.current_char == '#':
+                self.skip_comment()
             elif self.current_char in ';\n':
                 tokens.append(Token(TT_NEWLINE, pos_start=self.pos))
                 self.advance()
@@ -355,6 +357,15 @@ class Lexer:
             tok_type == TT_GTE
 
         return Token(tok_type, pos_start=pos_start, pos_end=self.pos)
+
+    def skip_comment(self):
+        self.advance()
+
+        while self.current_char != '\n':
+            self.advance()
+
+            self.advance()
+
 """
     # NODES
 """
@@ -1183,7 +1194,7 @@ class Parser:
         res.register_advancement()
         self.advance()
 
-        if self.current_token == TT_ARROW:
+        if self.current_token.type == TT_ARROW:
             res.register_advancement()
             self.advance()
 
@@ -1199,7 +1210,7 @@ class Parser:
         
         if self.current_token.type != TT_NEWLINE:
             return res.failure(InvalidSyntaxError(
-                self.current_tok.pos_start, self.current_tok.pos_end,
+                self.current_token.pos_start, self.current_token.pos_end,
                 f"Expected '->' or NEWLINE"
             ))
 
@@ -1795,6 +1806,54 @@ class BuiltInFunction(BaseFunction):
         return RTResult().success(Number.null)
     execute_extend.arg_names = ["listA", "listB"]
 
+    def execute_len(self, exec_ctx):
+        list_ = exec_ctx.symbol_table.get("list")
+
+        if not isinstance(list_, List):
+            return RTResult().failure(RunTimeError(
+                self.pos_start, self.pos_end,
+                "Argument must be list",
+                exec_ctx
+            ))
+
+        return RTResult().success(Number(len(list_.elements)))
+    execute_len.arg_names = ["list"]
+
+    def execute_run(self, exec_ctx):
+        fn = exec_ctx.symbol_table.get("fn")
+
+        if not isinstance(fn, String):
+            return RTResult().failure(RunTimeError(
+                self.pos_start, self.pos_end,
+                "Second argument must be string",
+                exec_ctx
+            ))
+
+        fn = fn.value
+
+        try:
+            with open(fn, "r") as f:
+                script = f.read()
+        except Exception as e:
+            return RTResult().failure(RunTimeError(
+                self.pos_start, self.pos_end,
+                f"Failed to load script \"{fn}\"\n" + str(e),
+                exec_ctx
+            ))
+
+        _, error = run(fn, script)
+        
+        if error:
+            return RTResult().failure(RunTimeError(
+                self.pos_start, self.pos_end,
+                f"Failed to finish executing script \"{fn}\"\n" +
+                error.as_string(),
+                exec_ctx
+            ))
+
+        return RTResult().success(Number.null)
+    execute_run.arg_names = ["fn"]
+
 BuiltInFunction.print       = BuiltInFunction("print")
 BuiltInFunction.print_ret   = BuiltInFunction("print_ret")
 BuiltInFunction.input       = BuiltInFunction("input")
@@ -1807,6 +1866,10 @@ BuiltInFunction.is_function = BuiltInFunction("is_function")
 BuiltInFunction.append      = BuiltInFunction("append")
 BuiltInFunction.pop         = BuiltInFunction("pop")
 BuiltInFunction.extend      = BuiltInFunction("extend")
+BuiltInFunction.len			= BuiltInFunction("len")
+BuiltInFunction.run			= BuiltInFunction("run")
+
+
 
 #################
 # CONTEXT
@@ -2114,6 +2177,8 @@ global_symbol_table.set("IS_FUN", BuiltInFunction.is_function)
 global_symbol_table.set("APPEND", BuiltInFunction.append)
 global_symbol_table.set("POP", BuiltInFunction.pop)
 global_symbol_table.set("EXTEND", BuiltInFunction.extend)
+global_symbol_table.set("LEN", BuiltInFunction.len)
+global_symbol_table.set("RUN", BuiltInFunction.run)
 
 def run(filename, text):
     # Generate tokens
