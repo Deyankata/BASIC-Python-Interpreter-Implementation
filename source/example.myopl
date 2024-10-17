@@ -1,0 +1,35 @@
+# This is an example program of my langauge
+# The code that implements this is not entirely tested, so it may contain bugs
+# To run the program, type "python shell.py", then enter the command "RUN("example.myopl")"
+
+FUN oopify(prefix) -> prefix + "oop"                           # FUN - function
+
+# Note: elements/i means the common element[i]
+
+FUN join(elements, separator)
+	VAR result = ""
+	VAR len = LEN(elements)
+
+	FOR i = 0 TO len THEN
+		VAR result = result + elements/i
+		IF i != len - 1 THEN VAR result = result + separator
+	END
+
+	RETURN result
+END
+
+FUN map(elements, func)
+	VAR new_elements = []
+
+	FOR i = 0 TO LEN(elements) THEN
+		APPEND(new_elements, func(elements/i))
+	END
+
+	RETURN new_elements
+END
+
+PRINT("Greetings universe!")
+
+FOR i = 0 TO 5 THEN
+    PRINT(join(map(["l", "sp"], oopify), ", "))  
+END
